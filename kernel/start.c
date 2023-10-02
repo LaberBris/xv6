@@ -52,6 +52,7 @@ void start() {
     // init uart and printf
     consoleinit();
     printfinit();
+    printf("[210110830] 在start函数中, 初始化驱动程序, 中断和切换执行模式\n");
   }
 
   // switch to supervisor mode and jump to main().

@@ -7,8 +7,9 @@
 volatile static int started = 0;
 
 // start() jumps here in supervisor mode on all CPUs.
-void main() {
+void main() { 
   if (cpuid() == 0) {
+    printf("[210110830] 进入main函数,初始化内核\n");
     // consoleinit();
     // printfinit();
     printf("\n");
