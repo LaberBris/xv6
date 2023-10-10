@@ -372,9 +372,11 @@ void exit(int status) {
   panic("zombie exit");
 }
 
+// FIXME: Task2
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
-int wait(uint64 addr) {
+// 如果flags=1, 则代表不需要进行阻塞wait
+int wait(uint64 addr, int flags) {
   struct proc *np;
   int havekids, pid;
   struct proc *p = myproc();
@@ -414,6 +416,11 @@ int wait(uint64 addr) {
 
     // No point waiting if we don't have any children.
     if (!havekids || p->killed) {
+      release(&p->lock);
+      return -1;
+    }
+
+    if (flags == 1) {
       release(&p->lock);
       return -1;
     }
