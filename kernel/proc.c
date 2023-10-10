@@ -21,6 +21,9 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[];  // trampoline.S
 
+// FIXME: add exit info
+char *states[] = {"unused", "sleep", "runnable", "run", "zombie"};
+
 // initialize the proc table at boot time.
 void procinit(void) {
   struct proc *p;
@@ -337,6 +340,21 @@ void exit(int status) {
   acquire(&original_parent->lock);
 
   acquire(&p->lock);
+
+  // FIXME: add exit info
+  // 分别打印当前进程信息和子进程信息
+
+  // 当前进程信息
+  exit_info("proc %d exit, parent pid %d, name %s, state %s\n",
+    p->pid, original_parent->pid, original_parent->name, states[p->state]);
+
+  // 子进程信息
+  for (struct proc *pp = proc; pp < &proc[NPROC]; pp++) {
+    if (pp->parent == p) {
+      exit_info("proc %d exit, child %d, pid %d, name %s, state %s\n", 
+        p->pid, pp - p - 1, pp->pid, pp->name, states[pp->state]);
+    }
+  }
 
   // Give any children to init.
   reparent(p);
