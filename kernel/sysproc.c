@@ -22,6 +22,7 @@ uint64 sys_wait(void) {
   uint64 p;
   int flag;
   if (argaddr(0, &p) < 0) return -1;
+  if (argint(1, &flag) < 0) return -1;
   return wait(p, flag);
 }
 

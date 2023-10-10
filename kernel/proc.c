@@ -385,6 +385,11 @@ int wait(uint64 addr, int flags) {
   // wakeups from a child's exit().
   acquire(&p->lock);
 
+  if (flags == 1) {
+    release(&p->lock);
+    return -1;
+  }
+  
   for (;;) {
     // Scan through table looking for exited children.
     havekids = 0;
@@ -416,11 +421,6 @@ int wait(uint64 addr, int flags) {
 
     // No point waiting if we don't have any children.
     if (!havekids || p->killed) {
-      release(&p->lock);
-      return -1;
-    }
-
-    if (flags == 1) {
       release(&p->lock);
       return -1;
     }
