@@ -346,7 +346,7 @@ void exit(int status) {
 
   // 当前进程信息
   exit_info("proc %d exit, parent pid %d, name %s, state %s\n",
-    p->pid, original_parent->pid, original_parent->name, states[p->state]);
+    p->pid, original_parent->pid, original_parent->name, states[original_parent->state]);
 
   // 子进程信息
   for (struct proc *pp = proc; pp < &proc[NPROC]; pp++) {
