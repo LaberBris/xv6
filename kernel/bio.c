@@ -33,13 +33,14 @@ struct {
   // Sorted by how recently the buffer was used.
   // head.next is most recent, head.prev is least.
   struct buf head[NBUCKETS];
+  struct spinlock hashlock;
 } bcache;
 
 void
 binit(void)
 {
   struct buf *b;
-  // initlock(&bcache.biglock, "bcache");
+  initlock(&bcache.hashlock, "bcache_glob");
   
   for (int cnt = 0; cnt < NBUCKETS; cnt++) {
     initlock(&bcache.lock[cnt], "bcache");  
@@ -81,12 +82,29 @@ bget(uint dev, uint blockno)
       return b;
     }
   }
-  release(&bcache.lock[start]);
 
-  for (int num = start; num < NBUCKETS + start; num++) {
-    // Not cached.
-    // Recycle the least recently used (LRU) unused buffer.
+
+  for (b = bcache.head[start].next; b != &bcache.head[start]; b = b->next) {
+    if (b->refcnt == 0) {
+      b->dev = dev;
+      b->blockno = blockno;
+      b->valid = 0;
+      b->refcnt = 1;
+      release(&bcache.lock[start]);
+      acquiresleep(&b->lock);
+      return b;
+    }
+  }
+  
+  release(&bcache.lock[start]);
+  acquire(&bcache.hashlock);
+
+  // Not cached.
+  // Recycle the least recently used (LRU) unused buffer.
+  for (int i = start + 1; i < NBUCKETS + start; i++) {
+    int num = i % NBUCKETS;
     acquire(&bcache.lock[num]);
+
     for(b = bcache.head[num].prev; b != &bcache.head[num]; b = b->prev) {
       if(b->refcnt == 0) {
         b->dev = dev;
@@ -94,16 +112,26 @@ bget(uint dev, uint blockno)
         b->valid = 0;
         b->refcnt = 1;
 
+        b->next->prev = b->prev;
+        b->prev->next = b->next;
+
+        acquire(&bcache.lock[start]);
+        b->next = bcache.head[start].next;
+        b->prev = &bcache.head[start];
+        bcache.head[start].next->prev = b;
+        bcache.head[start].next = b;
+          
         release(&bcache.lock[num]);
+        release(&bcache.lock[start]);
+        release(&bcache.hashlock);
         // release(&bcache.biglock);
         acquiresleep(&b->lock);
         return b;
       }
-      
     }
     release(&bcache.lock[num]);
   }
-
+  release(&bcache.hashlock);
   // release(&bcache.biglock);
   panic("bget: no buffers");
 }
@@ -138,10 +166,10 @@ brelse(struct buf *b)
 {
   if(!holdingsleep(&b->lock))
     panic("brelse");
-
-  int num = b->blockno % NBUCKETS;
+  
   releasesleep(&b->lock);
 
+  int num = b->blockno % NBUCKETS;
   acquire(&bcache.lock[num]);
   b->refcnt--;
   if (b->refcnt == 0) {
